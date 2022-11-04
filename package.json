@@ -1,0 +1,26 @@
+{
+  "name": "eclair-typescript",
+  "version": "1.0.0",
+  "description": "Eclair bindings for Javascript and Typescript",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luc-tielen/eclair-typescript.git"
+  },
+  "keywords": [
+    "eclair",
+    "bindings",
+    "datalog",
+    "wasm",
+    "webassembly"
+  ],
+  "author": "Luc Tielen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/luc-tielen/eclair-typescript/issues"
+  },
+  "homepage": "https://github.com/luc-tielen/eclair-typescript#readme"
+}
