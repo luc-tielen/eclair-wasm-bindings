@@ -20,6 +20,7 @@ const SERIALIZERS = {
   [FieldType.String]: (value: string) => { },
 };
 
+// TODO implement
 const DESERIALIZERS = {
   [FieldType.Number]: () => 42,
   [FieldType.String]: () => "abc",
@@ -27,6 +28,7 @@ const DESERIALIZERS = {
 
 // Order needs to be preserved, so we can't use object?
 // Or do we need to explicitly specify location at the type level?
+// Or we can make it a tuple of FieldInfo = {name: string, type: FieldType}
 type FactShape = [FieldType, ...FieldType[]];
 
 // Transforms the enum type into the actual underlying column type
@@ -48,8 +50,8 @@ type FactMetadata<
   dir: Dir;
   fields: Shape;
   // TODO rename to serialize / deserialize?
-  addFact: (fact: FactValue<Shape>) => void;
-  getFact: () => FactValue<Shape>;
+  serialize: (fact: FactValue<Shape>) => void;
+  deserialize: () => FactValue<Shape>;
 };
 
 const fact = <Name extends string, Dir extends Direction, T extends FactShape>(
@@ -64,24 +66,35 @@ const fact = <Name extends string, Dir extends Direction, T extends FactShape>(
     name,
     dir,
     fields,
-    addFact: (fact) => {
+    serialize: (fact) => {
       for (const k in fact) {
         const field = fields[k];
         const value = fact[k];
         serializers[field](value);
       }
     },
-    getFact: () =>
-      fields.map((field) => deserializers[field]()) as FactValue<T>,
+    deserialize: () =>
+      fields.map((field, i) => deserializers[i]()) as FactValue<T>,
   };
 };
 
-interface FactHandler<Dir extends Direction, Shape extends FactShape> {
-  dir: Dir;
+interface InputFactHandler<Shape extends FactShape> {
   addFact: (fact: FactValue<Shape>) => void;
   addFacts: (fact: FactValue<Shape>[]) => void;
+}
+
+interface OutputFactHandler<Shape extends FactShape> {
   getFacts: () => FactValue<Shape>[];
 }
+
+type FactHandler<
+  Dir extends Direction,
+  Shape extends FactShape
+> = Dir extends Direction.INPUT
+  ? InputFactHandler<Shape>
+  : Dir extends Direction.OUTPUT
+  ? OutputFactHandler<Shape>
+  : InputFactHandler<Shape> & OutputFactHandler<Shape>;
 
 type Program<T> = {
   [Key in keyof T]: T[Key] extends FactMetadata<
@@ -93,7 +106,7 @@ type Program<T> = {
   : never;
 };
 
-// TODO pass code as first arg
+// TODO pass WASM code as first arg
 const program = <T extends Object>(facts: T): Program<T> => {
   const result = Object.fromEntries(
     Object.entries(facts).map(([factName, factMetadata]) => {
@@ -107,9 +120,6 @@ const program = <T extends Object>(facts: T): Program<T> => {
         ? FactValue<Shape>
         : never;
 
-      // type Handler = T[Key] extends FactMetadata<string, infer Dir, infer Shape>
-      //   ? FactHandler<Dir, Shape>
-      //   : never;
       type FactMD = T[Key] extends FactMetadata<string, infer Dir, infer Shape>
         ? FactMetadata<string, Dir, Shape>
         : never;
@@ -120,9 +130,8 @@ const program = <T extends Object>(facts: T): Program<T> => {
           ...([Direction.INPUT, Direction.INPUT_OUTPUT].includes(
             factData.dir
           ) && {
-            addFact: factMetadata.addFact,
-            addFacts: (facts: FactType[]) =>
-              facts.forEach(factMetadata.addFact),
+            addFact: factData.serialize,
+            addFacts: (facts: FactType[]) => facts.forEach(factData.serialize),
           }),
           ...([Direction.OUTPUT, Direction.INPUT_OUTPUT].includes(
             factData.dir
@@ -131,7 +140,7 @@ const program = <T extends Object>(facts: T): Program<T> => {
               const count = 10; // TODO use count call
               const result: FactType[] = [];
               for (let i = 0; i < count; i++) {
-                result.push(factData.getFact() as FactType);
+                result.push(factData.deserialize() as FactType);
               }
               return result;
             },
@@ -153,4 +162,4 @@ const reachable = fact("reachable", Direction.OUTPUT, [
   FieldType.Number,
 ]);
 const path = program({ edge, reachable });
-console.log(path.edge);
+console.log(path.reachable);
