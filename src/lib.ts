@@ -41,18 +41,18 @@ type FactValue<T extends FactShape> = {
   [Property in keyof T]: ColumnType<T[Property]>;
 };
 
-type FactMetadata<
-  Name extends string,
+interface FactMetadata<
+  Name extends string, // TODO no need to keep track of name here at type level?
   Dir extends Direction,
   Shape extends FactShape
-> = {
+> {
   name: Name;
   dir: Dir;
   fields: Shape;
   // TODO rename to serialize / deserialize?
   serialize: (fact: FactValue<Shape>) => void;
   deserialize: () => FactValue<Shape>;
-};
+}
 
 const fact = <Name extends string, Dir extends Direction, T extends FactShape>(
   name: Name,
@@ -96,13 +96,23 @@ type FactHandler<
   ? OutputFactHandler<Shape>
   : InputFactHandler<Shape> & OutputFactHandler<Shape>;
 
+type GetFactName<T> = T extends FactMetadata<infer Name, any, any>
+  ? Name
+  : never;
+
+type GetFactNames<T> = T extends (infer U)[]
+  ? { [K in GetFactName<U>]: Extract<U, { name: K }> }
+  : never;
+
 type Program<T> = {
-  [Key in keyof T]: T[Key] extends FactMetadata<
+  [Key in GetFactName<T>]: Key extends keyof T
+  ? T[Key] extends FactMetadata<
     string, // TODO no need to keep track of string at the type level?
     infer Dir extends Direction,
     infer Shape extends FactShape
   >
   ? FactHandler<Dir, Shape>
+  : never
   : never;
 };
 
@@ -161,5 +171,15 @@ const reachable = fact("reachable", Direction.OUTPUT, [
   FieldType.Number,
   FieldType.Number,
 ]);
-const path = program({ edge, reachable });
-console.log(path.reachable);
+
+const bla = [edge, reachable];
+type A = GetFactNames<typeof bla>;
+const eclair = program([edge, reachable]);
+
+eclair.edge.addFact([1, 2]);
+eclair.edge.addFacts([
+  [2, 3],
+  [3, 4],
+]);
+
+console.log(eclair.reachable.getFacts());
