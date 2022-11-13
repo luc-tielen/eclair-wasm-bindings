@@ -1,63 +1,59 @@
-type Address = number;
+import {
+  FieldType,
+  Direction,
+  type FactShape,
+  type FactValue,
+  type FactMetadata,
+  type EclairProgram,
+  type EclairInstance,
+} from './types';
 
-interface Program {
-  address: Address;
-}
+export const encodeString = (program: EclairProgram, str: string) => {
+  // Conversion from UTF16 => UTF8 takes worst case 3x as many bytes
+  const maxByteCount = str.length * 3;
+  const address = program.instance.exports.eclair_malloc(maxByteCount);
+  const array = new Uint8Array(program.memory.buffer, address, maxByteCount);
+  const { written } = new TextEncoder().encodeInto(str, array);
+  const strIndex = program.instance.exports.eclair_encode_string(
+    program.handle.address,
+    written as number,
+    address
+  );
+  program.instance.exports.eclair_free(address);
+  return strIndex;
+};
 
-interface API {
-  exports: {
-    eclair_program_init: () => Address;
-    eclair_program_run: (handle: Address) => void;
-    eclair_program_destroy: (handle: Address) => void;
+export const decodeString = (program: EclairProgram, strIndex: number) => {
+  const symbolAddress = program.instance.exports.eclair_decode_string(
+    program.handle.address,
+    strIndex
+  );
+  const [length, dataAddress] = new Uint32Array(
+    program.memory.buffer,
+    symbolAddress,
+    2
+  );
+  const byteArray = new Uint8Array(program.memory.buffer, dataAddress, length);
+  return new TextDecoder().decode(byteArray);
+};
 
-    eclair_add_fact: (
-      handle: Address,
-      factType: number,
-      factData: Address
-    ) => void;
-    eclair_add_facts: (
-      handle: Address,
-      factType: number,
-      factData: Address,
-      factCount: number
-    ) => void;
+const SERIALIZERS = {
+  [FieldType.Number]: (_program: EclairProgram, value: number) => value,
+  [FieldType.String]: encodeString,
+};
 
-    eclair_fact_count: (handle: Address, factType: number) => number;
-    eclair_get_facts: (handle: Address, factType: number) => Address;
-    eclair_free_buffer: (factArray: Address) => void;
+const DESERIALIZERS = {
+  [FieldType.Number]: (_program: EclairProgram, value: number) => value,
+  [FieldType.String]: decodeString,
+};
 
-    eclair_encode_string: (
-      handle: Address,
-      length: number,
-      str: Address
-    ) => number;
-    eclair_decode_string: (handle: Address, strIndex: number) => Address;
-
-    eclair_malloc: (byteCount: number) => Address;
-    eclair_free: (address: Address) => void;
-  };
-}
-
-type EclairInstance = Omit<WebAssembly.Instance, "exports"> & API;
-
-interface EclairProgram {
-  instance: EclairInstance;
-  memory: WebAssembly.Memory;
-  handle: Program;
-}
-
-enum FieldType { } // TODO use other code here..
-interface FactMetadata {
-  name: string;
-  fields: [FieldType, ...FieldType[]];
-}
-
-const programInit = (
+export const programInit = (
   wasm: WebAssembly.Instance,
   memory: WebAssembly.Memory
 ): EclairProgram => {
-  // NOTE: this cast is very unsafe, but we need to rely on the dev to pass
-  // in a WASM program compiled with Eclair.
+  // NOTE: this cast is very unsafe since we don't know anything about the
+  // WASM instance passed in, but we need to rely on the dev to pass in a
+  // WASM program compiled with Eclair.
   const instance = wasm as EclairInstance;
   return {
     instance,
@@ -66,22 +62,43 @@ const programInit = (
   };
 };
 
-const programRun = (program: EclairProgram) =>
+export const programRun = (program: EclairProgram) =>
   program.instance.exports.eclair_program_run(program.handle.address);
 
-const programDestroy = (program: EclairProgram) =>
+export const programDestroy = (program: EclairProgram) =>
   program.instance.exports.eclair_program_destroy(program.handle.address);
 
-// TODO carry type information to this point, needed for serialization
-const addFact = (
+const serializeFact = <Shape extends FactShape>(
   program: EclairProgram,
-  metadata: FactMetadata,
-  fact: (number | string)[]
+  metadata: FactMetadata<string, Direction, Shape>
+) => {
+  const shape = metadata.fields;
+  const serializers = shape.map((field) => SERIALIZERS[field]);
+
+  return (fact: FactValue<Shape>) => {
+    const result = Array.from(shape, () => 0);
+
+    for (const column in fact) {
+      const field = shape[column];
+      const value = fact[column];
+      result[column] = serializers[field](program, value);
+    }
+
+    return result;
+  };
+};
+
+export const addFact = <Shape extends FactShape>(
+  program: EclairProgram,
+  metadata: FactMetadata<string, Direction, Shape>,
+  fact: FactValue<Shape>
 ) => {
   const byteCount = metadata.fields.length * Uint32Array.BYTES_PER_ELEMENT;
   const address = program.instance.exports.eclair_malloc(byteCount);
+
   const array = new Uint32Array(program.memory.buffer, address, byteCount);
-  array.set(fact); // TODO encode additional strings if needed
+  array.set(serializeFact(program, metadata)(fact));
+
   const factType = encodeString(program, metadata.name);
   program.instance.exports.eclair_add_fact(
     program.handle.address,
@@ -91,16 +108,18 @@ const addFact = (
   program.instance.exports.eclair_free(address);
 };
 
-const addFacts = (
+export const addFacts = <Shape extends FactShape>(
   program: EclairProgram,
-  metadata: FactMetadata,
-  facts: (number | string)[][]
+  metadata: FactMetadata<string, Direction, Shape>,
+  facts: FactValue<Shape>[]
 ) => {
   const byteCount =
     facts.length * metadata.fields.length * Uint32Array.BYTES_PER_ELEMENT;
   const address = program.instance.exports.eclair_malloc(byteCount);
+
   const array = new Uint32Array(program.memory.buffer, address, byteCount);
-  array.set(facts.flat()); // TODO encode additional strings if needed
+  const serializeOneFact = serializeFact(program, metadata);
+  array.set(facts.flatMap(serializeOneFact));
 
   const factType = encodeString(program, metadata.name);
   program.instance.exports.eclair_add_facts(
@@ -112,8 +131,10 @@ const addFacts = (
   program.instance.exports.eclair_free(address);
 };
 
-// TODO carry type info to here
-const getFacts = (program: EclairProgram, metadata: FactMetadata) => {
+export const getFacts = <Shape extends FactShape>(
+  program: EclairProgram,
+  metadata: FactMetadata<string, Direction, Shape>
+): FactValue<Shape>[] => {
   const factType = encodeString(program, metadata.name);
   const resultAddress = program.instance.exports.eclair_get_facts(
     program.handle.address,
@@ -130,42 +151,17 @@ const getFacts = (program: EclairProgram, metadata: FactMetadata) => {
     resultAddress,
     numColumns
   );
-  // TODO Array<Fact<...>>
-  const result: Array<number> = new Array(factCount);
-  for (let i = 0; i < resultArray.length; i += numColumns) {
-    const factData = resultArray.slice(i, i + numColumns);
-    result[i] = null; // TODO transform to fact
-  }
+
+  const shape = metadata.fields;
+  const deserializers = shape.map((field) => DESERIALIZERS[field]);
+  const array = Array(factCount).map((_empty, i) => {
+    const startIndex = i * numColumns;
+    const endIndex = startIndex + numColumns;
+    return Array.from(resultArray.slice(startIndex, endIndex)).map((value, i) =>
+      deserializers[i](program, value)
+    );
+  });
 
   program.instance.exports.eclair_free_buffer(resultAddress);
-  return result;
-};
-
-const encodeString = (program: EclairProgram, str: string) => {
-  // Conversion from UTF16 => UTF8 takes worst case 3x as many bytes
-  const maxByteCount = str.length * 3;
-  const address = program.instance.exports.eclair_malloc(maxByteCount);
-  const array = new Uint8Array(program.memory.buffer, address, maxByteCount);
-  const { written } = new TextEncoder().encodeInto(str, array);
-  const strIndex = program.instance.exports.eclair_encode_string(
-    program.handle.address,
-    written as number, // TODO check if written is correct
-    address
-  );
-  program.instance.exports.eclair_free(address);
-  return strIndex;
-};
-
-const decodeString = (program: EclairProgram, strIndex: number) => {
-  const symbolAddress = program.instance.exports.eclair_decode_string(
-    program.handle.address,
-    strIndex
-  );
-  const [length, dataAddress] = new Uint32Array(
-    program.memory.buffer,
-    symbolAddress,
-    2
-  );
-  const byteArray = new Uint8Array(program.memory.buffer, dataAddress, length);
-  return new TextDecoder().decode(byteArray);
+  return array as FactValue<Shape>[];
 };
