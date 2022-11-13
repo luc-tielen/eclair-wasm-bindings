@@ -7,40 +7,45 @@ import {
   type Program,
   type EclairProgram,
 } from './types';
-import { SERIALIZERS, DESERIALIZERS } from './serialization';
+import { addFact, addFacts, getFacts } from './bindings';
 
 export const number = (): FieldType.Number => FieldType.Number;
 
 export const string = (): FieldType.String => FieldType.String;
 
-const fact = <Name extends string, Dir extends Direction, T extends FactShape>(
+const fact = <
+  Name extends string,
+  Dir extends Direction,
+  Shape extends FactShape
+>(
   name: Name,
   dir: Dir,
-  fields: T
-): FactMetadata<Name, Dir, T> => {
-  const serializers = fields.map((field) => SERIALIZERS[field]);
-  const deserializers = fields.map((field) => DESERIALIZERS[field]);
-
+  fields: Shape
+): FactMetadata<Name, Dir, Shape> => {
   return {
     name,
     dir,
     fields,
-    serialize: (program: EclairProgram, fact: FactValue<T>) => {
-      for (const k in fact) {
-        const field = fields[k];
-        const value = fact[k];
-        serializers[field](program, value);
-      }
-    },
-    deserialize: (program: EclairProgram, value: number) =>
-      fields.map((_field, i) =>
-        deserializers[i](program, value)
-      ) as FactValue<T>,
+    // serialize: null,
+    // deserialize: null,
+    // serialize: (program: EclairProgram, fact: FactValue<T>) => {
+    //   for (const k in fact) {
+    //     const field = fields[k];
+    //     const value = fact[k];
+    //     serializers[field](program, value);
+    //   }
+    // },
+    // deserialize: (program: EclairProgram, value: number) =>
+    //   fields.map((_field, i) =>
+    //     deserializers[i](program, value)
+    //   ) as FactValue<T>,
   };
 };
 
-// TODO pass WASM code as first arg
-const program = <T extends ArrayLike<unknown>>(facts: T): Program<T> => {
+const program = <T extends ArrayLike<unknown>>(
+  program: EclairProgram,
+  facts: T
+): Program<T> => {
   const result = Object.fromEntries(
     Object.values(facts).map((factMetadata) => {
       type Key = keyof T;
@@ -61,31 +66,18 @@ const program = <T extends ArrayLike<unknown>>(facts: T): Program<T> => {
         : never;
       const factData = factMetadata as FactMD;
 
-      // TODO init program, or pass in as param
-      let program: EclairProgram;
-
       return [
         factData.name,
         {
           ...([Direction.INPUT, Direction.INPUT_OUTPUT].includes(
             factData.dir
           ) && {
-            addFact: factData.serialize,
-            addFacts: (facts: FactType[]) =>
-              facts.forEach((fact) => factData.serialize(program, fact)),
+            addFact: (fact: FactType) => addFact(program, factData, fact),
+            addFacts: (facts: FactType[]) => addFacts(program, factData, facts),
           }),
           ...([Direction.OUTPUT, Direction.INPUT_OUTPUT].includes(
             factData.dir
-          ) && {
-            getFacts: () => {
-              const count = 10; // TODO use count call
-              const result: FactType[] = [];
-              for (let i = 0; i < count; i++) {
-                result.push(factData.deserialize(program, null) as FactType);
-              }
-              return result;
-            },
-          }),
+          ) && { getFacts: () => getFacts(program, factData) }),
         },
       ];
     })
@@ -104,7 +96,7 @@ const reachable = fact('reachable', Direction.OUTPUT, [
   FieldType.Number,
 ]);
 
-const eclair = program([edge, reachable]);
+const eclair = program(null, [edge, reachable]);
 
 eclair.edge.addFact([1, 2]);
 eclair.edge.addFacts([
