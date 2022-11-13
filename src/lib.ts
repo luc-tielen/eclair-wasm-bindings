@@ -42,17 +42,53 @@ type FactValue<T extends FactShape> = {
 };
 
 interface FactMetadata<
-  Name extends string, // TODO no need to keep track of name here at type level?
+  Name extends string,
   Dir extends Direction,
   Shape extends FactShape
 > {
   name: Name;
   dir: Dir;
   fields: Shape;
-  // TODO rename to serialize / deserialize?
   serialize: (fact: FactValue<Shape>) => void;
   deserialize: () => FactValue<Shape>;
 }
+
+interface InputFactHandler<Shape extends FactShape> {
+  addFact: (fact: FactValue<Shape>) => void;
+  addFacts: (fact: FactValue<Shape>[]) => void;
+}
+
+interface OutputFactHandler<Shape extends FactShape> {
+  getFacts: () => FactValue<Shape>[];
+}
+
+type FactHandler<
+  Dir extends Direction,
+  Shape extends FactShape
+> = Dir extends Direction.INPUT
+  ? InputFactHandler<Shape>
+  : Dir extends Direction.OUTPUT
+  ? OutputFactHandler<Shape>
+  : InputFactHandler<Shape> & OutputFactHandler<Shape>;
+
+type GetFactName<T> = T extends FactMetadata<infer Name, any, any>
+  ? Name
+  : never;
+
+// Program maps a list of fact definitions to an object of fact handlers, where the keys are the names of the facts
+type Program<T> = T extends (infer U)[]
+  ? {
+    // Extract finds the matching union based on the type level fact name.
+    // Once it is found, it will map the type to a FactHandler
+    [Name in GetFactName<U>]: Extract<U, { name: Name }> extends FactMetadata<
+      string,
+      infer Dir,
+      infer Shape
+    >
+    ? FactHandler<Dir, Shape>
+    : never;
+  }
+  : never;
 
 const fact = <Name extends string, Dir extends Direction, T extends FactShape>(
   name: Name,
@@ -78,50 +114,11 @@ const fact = <Name extends string, Dir extends Direction, T extends FactShape>(
   };
 };
 
-interface InputFactHandler<Shape extends FactShape> {
-  addFact: (fact: FactValue<Shape>) => void;
-  addFacts: (fact: FactValue<Shape>[]) => void;
-}
-
-interface OutputFactHandler<Shape extends FactShape> {
-  getFacts: () => FactValue<Shape>[];
-}
-
-type FactHandler<
-  Dir extends Direction,
-  Shape extends FactShape
-> = Dir extends Direction.INPUT
-  ? InputFactHandler<Shape>
-  : Dir extends Direction.OUTPUT
-  ? OutputFactHandler<Shape>
-  : InputFactHandler<Shape> & OutputFactHandler<Shape>;
-
-type GetFactName<T> = T extends FactMetadata<infer Name, any, any>
-  ? Name
-  : never;
-
-type GetFactNames<T> = T extends (infer U)[]
-  ? { [K in GetFactName<U>]: Extract<U, { name: K }> }
-  : never;
-
-type Program<T> = {
-  [Key in GetFactName<T>]: Key extends keyof T
-  ? T[Key] extends FactMetadata<
-    string, // TODO no need to keep track of string at the type level?
-    infer Dir extends Direction,
-    infer Shape extends FactShape
-  >
-  ? FactHandler<Dir, Shape>
-  : never
-  : never;
-};
-
 // TODO pass WASM code as first arg
 const program = <T extends Object>(facts: T): Program<T> => {
   const result = Object.fromEntries(
-    Object.entries(facts).map(([factName, factMetadata]) => {
+    Object.values(facts).map((factMetadata) => {
       type Key = keyof T;
-
       type FactType = T[Key] extends FactMetadata<
         string,
         Direction,
@@ -130,12 +127,16 @@ const program = <T extends Object>(facts: T): Program<T> => {
         ? FactValue<Shape>
         : never;
 
-      type FactMD = T[Key] extends FactMetadata<string, infer Dir, infer Shape>
-        ? FactMetadata<string, Dir, Shape>
+      type FactMD = T[Key] extends FactMetadata<
+        infer Name,
+        infer Dir,
+        infer Shape
+      >
+        ? FactMetadata<Name, Dir, Shape>
         : never;
       const factData = factMetadata as FactMD;
       return [
-        factName,
+        factData.name,
         {
           ...([Direction.INPUT, Direction.INPUT_OUTPUT].includes(
             factData.dir
@@ -160,7 +161,7 @@ const program = <T extends Object>(facts: T): Program<T> => {
     })
   );
 
-  return result as unknown as Program<T>;
+  return result as Program<T>;
 };
 
 const edge = fact("edge", Direction.INPUT, [
@@ -172,8 +173,6 @@ const reachable = fact("reachable", Direction.OUTPUT, [
   FieldType.Number,
 ]);
 
-const bla = [edge, reachable];
-type A = GetFactNames<typeof bla>;
 const eclair = program([edge, reachable]);
 
 eclair.edge.addFact([1, 2]);
