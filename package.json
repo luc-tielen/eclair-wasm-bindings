@@ -1,14 +1,14 @@
 {
-  "name": "eclair-typescript",
+  "name": "eclair-wasm-bindings",
   "version": "1.0.0",
-  "description": "Eclair bindings for Javascript and Typescript",
+  "description": "Eclair WebAssembly bindings for Javascript and Typescript",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/luc-tielen/eclair-typescript.git"
+    "url": "git+https://github.com/luc-tielen/eclair-wasm-bindings.git"
   },
   "keywords": [
     "eclair",
@@ -20,7 +20,7 @@
   "author": "Luc Tielen",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/luc-tielen/eclair-typescript/issues"
+    "url": "https://github.com/luc-tielen/eclair-wasm-bindings/issues"
   },
-  "homepage": "https://github.com/luc-tielen/eclair-typescript#readme"
+  "homepage": "https://github.com/luc-tielen/eclair-wasm-bindings#README.md"
 }
