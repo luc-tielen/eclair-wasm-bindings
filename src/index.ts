@@ -16,8 +16,21 @@ import {
   getFacts,
 } from './bindings';
 
-export const u32 = FieldType.Number;
-export const string = FieldType.String;
+export type {
+  EclairProgram,
+  FactShape,
+  FactMetadata,
+  FactValue,
+  Program,
+  Direction,
+  FieldType,
+};
+
+export const INPUT = Direction.INPUT;
+export const OUTPUT = Direction.OUTPUT;
+export const INPUT_OUTPUT = Direction.INPUT_OUTPUT;
+export const U32 = FieldType.Number;
+export const STRING = FieldType.String;
 
 export const fact = <
   Name extends string,
@@ -83,31 +96,3 @@ export const withEclair = <T>(
   programDestroy(handle);
   return result;
 };
-
-const memory = new WebAssembly.Memory({ initial: 10, maximum: 100 });
-const wasmBinary = fetch('/path/to/eclair_program.wasm');
-const { instance: wasmInstance } = await WebAssembly.instantiateStreaming(
-  wasmBinary,
-  { js: { mem: memory } }
-);
-
-const results = withEclair(wasmInstance, memory, (handle) => {
-  const edge = fact('edge', Direction.INPUT, [u32, u32]);
-  const reachable = fact('reachable', Direction.OUTPUT, [u32, u32]);
-  const path = program(handle, [edge, reachable]);
-
-  path.edge.addFact([1, 2]);
-  path.edge.addFacts([
-    [2, 3],
-    [3, 4],
-  ]);
-
-  path.run();
-
-  const reachableFacts = path.reachable.getFacts();
-
-  // You can do anything with the results here..
-  console.log(reachableFacts);
-  // Or return the results so they can be used outside this function!
-  return reachableFacts;
-});
