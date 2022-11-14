@@ -7,13 +7,19 @@ import {
   type Program,
   type EclairProgram,
 } from './types';
-import { addFact, addFacts, getFacts } from './bindings';
+import {
+  programInit,
+  programRun,
+  programDestroy,
+  addFact,
+  addFacts,
+  getFacts,
+} from './bindings';
 
-export const number = (): FieldType.Number => FieldType.Number;
+export const u32 = FieldType.Number;
+export const string = FieldType.String;
 
-export const string = (): FieldType.String => FieldType.String;
-
-const fact = <
+export const fact = <
   Name extends string,
   Dir extends Direction,
   Shape extends FactShape
@@ -21,28 +27,9 @@ const fact = <
   name: Name,
   dir: Dir,
   fields: Shape
-): FactMetadata<Name, Dir, Shape> => {
-  return {
-    name,
-    dir,
-    fields,
-    // serialize: null,
-    // deserialize: null,
-    // serialize: (program: EclairProgram, fact: FactValue<T>) => {
-    //   for (const k in fact) {
-    //     const field = fields[k];
-    //     const value = fact[k];
-    //     serializers[field](program, value);
-    //   }
-    // },
-    // deserialize: (program: EclairProgram, value: number) =>
-    //   fields.map((_field, i) =>
-    //     deserializers[i](program, value)
-    //   ) as FactValue<T>,
-  };
-};
+): FactMetadata<Name, Dir, Shape> => ({ name, dir, fields });
 
-const program = <T extends ArrayLike<unknown>>(
+export const program = <T extends ArrayLike<unknown>>(
   program: EclairProgram,
   facts: T
 ): Program<T> => {
@@ -83,25 +70,44 @@ const program = <T extends ArrayLike<unknown>>(
     })
   );
 
-  return result as Program<T>;
+  return { run: () => programRun(program), ...result } as Program<T>;
 };
 
-// TODO move to README
-const edge = fact('edge', Direction.INPUT, [
-  FieldType.Number,
-  FieldType.Number,
-]);
-const reachable = fact('reachable', Direction.OUTPUT, [
-  FieldType.Number,
-  FieldType.Number,
-]);
+export const withEclair = <T>(
+  wasm: WebAssembly.Instance,
+  memory: WebAssembly.Memory,
+  continuation: (program: EclairProgram) => T
+) => {
+  const handle = programInit(wasm, memory);
+  const result = continuation(handle);
+  programDestroy(handle);
+  return result;
+};
 
-const eclair = program(null, [edge, reachable]);
+const memory = new WebAssembly.Memory({ initial: 10, maximum: 100 });
+const wasmBinary = fetch('/path/to/eclair_program.wasm');
+const { instance: wasmInstance } = await WebAssembly.instantiateStreaming(
+  wasmBinary,
+  { js: { mem: memory } }
+);
 
-eclair.edge.addFact([1, 2]);
-eclair.edge.addFacts([
-  [2, 3],
-  [3, 4],
-]);
+const results = withEclair(wasmInstance, memory, (handle) => {
+  const edge = fact('edge', Direction.INPUT, [u32, u32]);
+  const reachable = fact('reachable', Direction.OUTPUT, [u32, u32]);
+  const path = program(handle, [edge, reachable]);
 
-console.log(eclair.reachable.getFacts());
+  path.edge.addFact([1, 2]);
+  path.edge.addFacts([
+    [2, 3],
+    [3, 4],
+  ]);
+
+  path.run();
+
+  const reachableFacts = path.reachable.getFacts();
+
+  // You can do anything with the results here..
+  console.log(reachableFacts);
+  // Or return the results so they can be used outside this function!
+  return reachableFacts;
+});

@@ -74,7 +74,7 @@ export type Program<T> = T extends (infer U)[]
     >
     ? FactHandler<Dir, Shape>
     : never;
-  }
+  } & { run: () => void }
   : never;
 
 // Types for the low level Eclair interface::
