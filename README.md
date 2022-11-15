@@ -5,7 +5,24 @@ Eclair Datalog programs compiled to WebAssembly.
 
 ## Getting started
 
-The snippet below shows how you can use this library:
+Given the following Eclair program to compute all reachable points in a graph:
+
+```prolog
+@def edge(u32, u32).
+@def reachable(u32, u32).
+
+// 2 points are reachable from one another if there is a direct edge between them.
+reachable(x, y) :-
+  edge(x, y).
+
+// 2 points are reachable from one another if there is a third point 'y'
+// such that there is an edge from 'x' to 'y', and 'z' is reachable from 'y'.
+reachable(x, z) :-
+  edge(x, y),
+  reachable(y, z).
+```
+
+Then the snippet below shows how you can use this library:
 
 ```typescript
 import {
