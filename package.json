@@ -1,9 +1,13 @@
 {
   "name": "eclair-wasm-bindings",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Eclair WebAssembly bindings for Javascript and Typescript",
-  "main": "index.js",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
   "scripts": {
+    "build": "npm run clean && node build.js && tsc --emitDeclarationOnly --outDir dist",
+    "clean": "rm -rf dist/",
+    "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -26,6 +30,11 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.42.1",
     "@typescript-eslint/parser": "^5.42.1",
-    "eslint": "^8.27.0"
-  }
+    "esbuild": "^0.15.14",
+    "eslint": "^8.27.0",
+    "typescript": "^4.8.4"
+  },
+  "files": [
+    "dist"
+  ]
 }

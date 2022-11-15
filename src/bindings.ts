@@ -79,9 +79,12 @@ const serializeFact = <Shape extends FactShape>(
     const result = Array.from(shape, () => 0);
 
     for (const column in fact) {
-      const field = shape[column];
       const value = fact[column];
-      result[column] = serializers[field](program, value);
+      const serializer = serializers[column] as (
+        p: EclairProgram,
+        v: string | number
+      ) => number;
+      result[column] = serializer(program, value);
     }
 
     return result;

@@ -34,9 +34,6 @@ export interface FactMetadata<
   name: Name;
   dir: Dir;
   fields: Shape;
-  // TODO remove
-  // serialize: (program: EclairProgram, fact: FactValue<Shape>) => void;
-  // deserialize: (program: EclairProgram, value: number) => FactValue<Shape>;
 }
 
 interface InputFactHandler<Shape extends FactShape> {
