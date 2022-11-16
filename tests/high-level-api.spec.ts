@@ -1,13 +1,5 @@
-//
 import fs from 'fs/promises';
-import {
-  fact,
-  program,
-  withEclair,
-  U32,
-  INPUT,
-  OUTPUT,
-} from 'eclair-wasm-bindings';
+import { fact, program, withEclair, U32, INPUT, OUTPUT } from '../src/';
 
 describe('high level API', () => {
   it('can run an Eclair program compiled to WebAssembly', async () => {

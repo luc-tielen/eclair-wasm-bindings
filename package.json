@@ -9,7 +9,8 @@
     "build": "npm run clean && node build.js && tsc --emitDeclarationOnly --outDir dist",
     "clean": "rm -rf dist/",
     "prepublishOnly": "npm run build",
-    "test": "jest tests/"
+    "test": "jest tests/",
+    "test-watch": "jest tests/ --watch"
   },
   "repository": {
     "type": "git",

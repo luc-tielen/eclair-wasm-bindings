@@ -91,6 +91,7 @@ const serializeFact = <Shape extends FactShape>(
   };
 };
 
+// TODO only allow Direction.INPUT(_OUTPUT)
 export const addFact = <Shape extends FactShape>(
   program: EclairProgram,
   metadata: FactMetadata<string, Direction, Shape>,
@@ -111,6 +112,7 @@ export const addFact = <Shape extends FactShape>(
   program.instance.exports.eclair_free(address);
 };
 
+// TODO only allow Direction.INPUT(_OUTPUT)
 export const addFacts = <Shape extends FactShape>(
   program: EclairProgram,
   metadata: FactMetadata<string, Direction, Shape>,
@@ -134,6 +136,7 @@ export const addFacts = <Shape extends FactShape>(
   program.instance.exports.eclair_free(address);
 };
 
+// TODO only allow Direction.OUTPUT(_OUTPUT)
 export const getFacts = <Shape extends FactShape>(
   program: EclairProgram,
   metadata: FactMetadata<string, Direction, Shape>
