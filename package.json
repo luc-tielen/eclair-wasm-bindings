@@ -4,6 +4,7 @@
   "description": "Eclair WebAssembly bindings for Javascript and Typescript",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "npm run clean && node build.js && tsc --emitDeclarationOnly --outDir dist",
     "clean": "rm -rf dist/",

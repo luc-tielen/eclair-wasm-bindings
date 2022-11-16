@@ -41,7 +41,7 @@ const memory = new WebAssembly.Memory({ initial: 10, maximum: 100 });
 // Fetch / compile the WASM program.
 const { instance: wasmInstance } = await WebAssembly.instantiateStreaming(
   fetch('/path/to/eclair_program.wasm'),
-  { js: { mem: memory } }
+  { env: { memory } }
 );
 
 // Now start Eclair using `withEclair`. This automatically takes care of
