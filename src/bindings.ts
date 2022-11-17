@@ -151,20 +151,21 @@ export const getFacts = <Shape extends FactShape>(
     factType
   );
 
-  const numColumns = factCount * metadata.fields.length;
+  const numColumns = metadata.fields.length;
+  const numValues = factCount * numColumns;
   const resultArray = new Uint32Array(
     program.memory.buffer,
     resultAddress,
-    numColumns
+    numValues
   );
 
   const shape = metadata.fields;
   const deserializers = shape.map((field) => DESERIALIZERS[field]);
-  const array = Array(factCount).map((_empty, i) => {
+  const array = Array.from(Array(factCount), (_empty, i) => {
     const startIndex = i * numColumns;
     const endIndex = startIndex + numColumns;
-    return Array.from(resultArray.slice(startIndex, endIndex)).map((value, i) =>
-      deserializers[i](program, value)
+    return Array.from(resultArray.slice(startIndex, endIndex)).map(
+      (value, column) => deserializers[column](program, value)
     );
   });
 

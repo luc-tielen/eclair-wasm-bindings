@@ -49,8 +49,6 @@ describe('bindings', () => {
       // this will give no results.
       const { instance, memory } = await setupWasm();
       const program = programInit(instance, memory);
-      programRun(program);
-      programDestroy(program);
       addFact(
         program,
         {
@@ -60,12 +58,16 @@ describe('bindings', () => {
         },
         [1, 2]
       );
+
+      programRun(program);
+
       const results = getFacts(program, {
         name: 'reachable',
         dir: Direction.OUTPUT,
         fields: [FieldType.Number, FieldType.Number],
       });
       expect(results).toEqual([[1, 2]]);
+      programDestroy(program);
     });
 
     it('should compute results after adding multiple facts', async () => {
@@ -73,8 +75,6 @@ describe('bindings', () => {
       // this will give no results.
       const { instance, memory } = await setupWasm();
       const program = programInit(instance, memory);
-      programRun(program);
-      programDestroy(program);
       addFact(
         program,
         {
@@ -96,6 +96,7 @@ describe('bindings', () => {
           [3, 4],
         ]
       );
+      programRun(program);
       const results = getFacts(program, {
         name: 'reachable',
         dir: Direction.OUTPUT,
@@ -109,6 +110,7 @@ describe('bindings', () => {
         [2, 4],
         [3, 4],
       ]);
+      programDestroy(program);
     });
   });
 
@@ -141,29 +143,4 @@ describe('bindings', () => {
     ]);
     programDestroy(program);
   });
-  // it('TODO', async () => {
-  //   const memory = new WebAssembly.Memory({ initial: 10 });
-  //   const file = await fs.readFile('./tests/fixtures/path.wasm');
-  //   const { instance: wasmInstance } = await WebAssembly.instantiate(
-  //     file.buffer,
-  //     { env: { memory } }
-  //   );
-  //
-  //   const results = withEclair(wasmInstance, memory, (handle) => {
-  //     const edge = fact('edge', INPUT, [U32, U32]);
-  //     const reachable = fact('reachable', OUTPUT, [U32, U32]);
-  //     const path = program(handle, [edge, reachable]);
-  //
-  //     path.edge.addFact([1, 2]);
-  //     path.edge.addFact([2, 3]);
-  //     path.run();
-  //     return path.reachable.getFacts();
-  //   });
-  //
-  //   expect(results).toEqual([
-  //     [1, 2],
-  //     [2, 3],
-  //     [1, 3],
-  //   ]);
-  // });
 });
