@@ -1,7 +1,8 @@
 # Eclair WASM bindings
 
 This library provides a high level API for Javascript / Typescript to execute
-Eclair Datalog programs compiled to WebAssembly.
+[Eclair Datalog](https://github.com/luc-tielen/eclair-lang) programs compiled to
+WebAssembly.
 
 ## Getting started
 

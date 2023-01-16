@@ -21,6 +21,7 @@
     "skipLibCheck": true, // Skip type checking of all declaration files
     "sourceMap": true, // Generate corrresponding .map file
     "strict": true, // Enable all strict type checking options
+    "strictNullChecks": true, // Enable stricter null checking
     "target": "es6" // Specify ECMAScript target version
   },
   "include": ["src/**/*.ts"],
