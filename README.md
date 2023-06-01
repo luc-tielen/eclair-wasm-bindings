@@ -9,8 +9,8 @@ WebAssembly.
 Given the following Eclair program to compute all reachable points in a graph:
 
 ```prolog
-@def edge(u32, u32).
-@def reachable(u32, u32).
+@def edge(u32, u32) input.
+@def reachable(u32, u32) output.
 
 // 2 points are reachable from one another if there is a direct edge between them.
 reachable(x, y) :-
